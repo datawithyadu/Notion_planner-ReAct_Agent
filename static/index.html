@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ReAct-o-Bot</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app">
+        <header id="header">
+            <div class="bot-avatar-header">
+                <svg viewBox="0 0 60 60" class="bot-svg">
+                    <circle cx="30" cy="34" r="20" fill="#F2B138"/>
+                    <rect x="27" y="6" width="6" height="14" rx="3" fill="#8A93A3"/>
+                    <circle cx="30" cy="8" r="4" class="antenna-bob" fill="#5FD0C0"/>
+                    <circle cx="22" cy="32" r="4" fill="#14171C"/>
+                    <circle cx="38" cy="32" r="4" fill="#14171C"/>
+                    <path d="M22 42 Q30 48 38 42" stroke="#14171C" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div class="header-text">
+                <h1>ReAct-o-Bot</h1>
+                <p class="subtitle">reasons a little too hard about small talk</p>
+            </div>
+        </header>
+
+        <main id="messages"></main>
+
+        <footer id="input-area">
+            <input type="text" id="query-input" placeholder="Ask it something. It will overthink." autocomplete="off" />
+            <button id="send-btn">
+                <span>Send</span>
+            </button>
+        </footer>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+# CI/CD pipeline for the ReAct Agent project.
+# On every push to main: build the Docker image, push it to GitHub Container
+# Registry (GHCR), then SSH into the EC2 instance and restart the container
+# with the new image.
+name: Deploy React Agent
+
+# Trigger: only runs when code lands on main (not other branches/PRs).
+on:
+  push:
+    branches: [main]
+
+# Shared values used by multiple steps below, so the registry/image name
+# aren't repeated (and risk going out of sync) in several places.
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}   # e.g. datawithyadu/react-agent-project
+
+jobs:
+  # ---------------------------------------------------------------------
+  # JOB 1: Build the Docker image and push it to GHCR.
+  # ---------------------------------------------------------------------
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read      # needed to check out the repo
+      packages: write     # needed to push an image to GHCR
+    steps:
+      # Runner starts as an empty VM — this copies the repo's code onto it.
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Authenticate to GHCR before we're allowed to push anything.
+      # GITHUB_TOKEN is auto-generated per run and expires when the job ends —
+      # fine here because this login only needs to last for this job.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Auto-generate image tags/labels instead of hardcoding ":latest" only.
+      # - "latest" always points at the most recent build (deploy job uses this)
+      # - "sha-xxxxxxx" tags this exact build to its commit, so a specific
+      #   past version can be pulled/rolled back to if a deploy breaks something
+      - name: Extract metadata (tags and labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+
+      # Equivalent of `docker build` + `docker push`, using the tags/labels
+      # generated above instead of one fixed tag.
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  # ---------------------------------------------------------------------
+  # JOB 2: SSH into EC2 and restart the container with the new image.
+  # `needs: build-and-push` forces this to wait until the image above has
+  # actually been built and pushed — otherwise there'd be nothing to pull.
+  # ---------------------------------------------------------------------
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          # Plain shell, run on the EC2 box itself — same steps as a manual
+          # deploy, just automated:
+          script: |
+            # GITHUB_TOKEN from the job above doesn't carry over to this
+            # external machine, so log in again with a durable PAT
+            # (only needed if the GHCR package is private).
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull the image the build-and-push job just published.
+            docker pull ghcr.io/${{ github.repository }}:latest
+
+            # Stop and remove the currently running container.
+            # "|| true" prevents failure on the very first deploy, when no
+            # container exists yet to stop/remove.
+            docker stop react-agent-container || true
+            docker rm react-agent-container || true
+
+            # Start the new container. --env-file .env supplies secrets
+            # (Notion/Groq keys) that are never committed to git — this
+            # file must already exist on the EC2 instance beforehand.
+            docker run -d \
+              --name react-agent-container \
+              --env-file .env \
+              -p 8000:8000 \
+              ghcr.io/${{ github.repository }}:latest
