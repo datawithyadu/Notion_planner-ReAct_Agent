@@ -11,9 +11,15 @@ on:
 
 # Shared values used by multiple steps below, so the registry/image name
 # aren't repeated (and risk going out of sync) in several places.
+#
+# IMAGE_NAME is hardcoded lowercase here rather than using
+# ${{ github.repository }} directly, because Docker/GHCR image names must
+# be all-lowercase, but this repo's actual name has capital letters
+# (datawithyadu/Notion_planner-ReAct_Agent). Using the raw repo name caused
+# "invalid reference format: repository name ... must be lowercase" errors.
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}   # e.g. datawithyadu/react-agent-project
+  IMAGE_NAME: datawithyadu/notion_planner-react_agent
 
 jobs:
   # ---------------------------------------------------------------------
@@ -86,7 +92,8 @@ jobs:
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             # Pull the image the build-and-push job just published.
-            docker pull ghcr.io/${{ github.repository }}:latest
+            # (lowercase image name — see note in the env block above)
+            docker pull ghcr.io/datawithyadu/notion_planner-react_agent:latest
 
             # Stop and remove the currently running container.
             # "|| true" prevents failure on the very first deploy, when no
@@ -101,4 +108,4 @@ jobs:
               --name react-agent-container \
               --env-file .env \
               -p 8000:8000 \
-              ghcr.io/${{ github.repository }}:latest
+              ghcr.io/datawithyadu/notion_planner-react_agent:latest
