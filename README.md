@@ -109,7 +109,7 @@ This project deploys to AWS EC2 via a GitHub Actions pipeline (`.github/workflow
 
 ---
 
-## Postmortem — known failure modes & fixes in progress
+## Evaluation cycle — known failure modes & fixes in progress
 
 Built as project 1 of a portfolio series aimed at business-facing AI / AI-consultant roles, with an explicit focus on evaluating agent reliability, cost, and trustworthiness rather than just "does it run."
 
